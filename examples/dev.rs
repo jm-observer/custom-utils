@@ -7,10 +7,15 @@ use log::{debug, error, info, warn};
 async fn main() {
     let handle = daemon();
     if let Err(_e) = handle.await {}
-
-    custom_utils::logger::logger_feature("dev", Debug, Info)
-        .module("custom_utils", Debug)
-        .build();
+    custom_utils::logger::logger_feature_with_path(
+        "dev",
+        Debug,
+        Info,
+        "./log".into(),
+        "./log".into(),
+    )
+    .module("custom_utils", Debug)
+    .build();
     debug!("abc");
     info!("abc");
     warn!("warn");

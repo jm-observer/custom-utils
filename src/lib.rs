@@ -18,7 +18,7 @@ pub mod args {
 #[cfg(feature = "logger")]
 pub mod logger {
     pub use crate::util_logger::{
-        custom_build, logger_feature, logger_stdout, logger_stdout_debug,
+        custom_build, logger_feature, logger_feature_with_path, logger_stdout, logger_stdout_debug,
     };
     pub use flexi_logger::*;
     pub use log::{debug, error, info, trace};

@@ -146,7 +146,7 @@ impl LoggerBuilder2 {
         }
     }
 }
-
+#[allow(dead_code)]
 pub struct LoggerFeatureBuilder {
     _app: String,
     _debug_level: LevelFilter,
@@ -158,12 +158,19 @@ pub struct LoggerFeatureBuilder {
     append: bool,
     modules: Vec<(String, LevelFilter)>,
     writer: Option<Box<dyn LogWriter>>,
+    log_etc_path: PathBuf,
 }
 impl LoggerFeatureBuilder {
-    pub fn default(app: &str, _debug_level: LevelFilter, prod_level: LevelFilter) -> Self {
-        let fs_path = PathBuf::from_str("/var/local/log").unwrap().join(app);
+    pub fn default(
+        app: &str,
+        _debug_level: LevelFilter,
+        prod_level: LevelFilter,
+        log_etc_path: PathBuf,
+        log_path: PathBuf,
+    ) -> Self {
+        // let fs_path = PathBuf::from_str("/var/local/log").unwrap().join(app);
         let fs = FileSpec::default()
-            .directory(fs_path)
+            .directory(log_path)
             .basename(app)
             .suffix("log");
         // 若为true，则会覆盖rotate中的数字、keep^
@@ -182,6 +189,7 @@ impl LoggerFeatureBuilder {
             append,
             modules: Vec::new(),
             writer: None,
+            log_etc_path,
         }
     }
     pub fn module<M: AsRef<str>>(mut self, module_name: M, lf: LevelFilter) -> Self {
@@ -214,10 +222,7 @@ impl LoggerFeatureBuilder {
         for (module, level) in self.modules {
             log_spec_builder.module(module, level);
         }
-        let path = PathBuf::from_str("/var/local/etc/")
-            .unwrap()
-            .join(self._app)
-            .join("logspecification.toml");
+        let path = self.log_etc_path.join("logspecification.toml");
         if let Some(w) = self.writer {
             Logger::with(log_spec_builder.build())
                 .format(with_thread)

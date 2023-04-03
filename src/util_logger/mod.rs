@@ -1,6 +1,7 @@
 use crate::util_logger::builder::{LoggerBuilder, LoggerFeatureBuilder};
 use flexi_logger::LoggerHandle;
 use log::LevelFilter;
+use std::path::PathBuf;
 
 mod builder;
 
@@ -29,7 +30,31 @@ pub fn logger_feature(
     debug_level: LevelFilter,
     prod_level: LevelFilter,
 ) -> LoggerFeatureBuilder {
-    LoggerFeatureBuilder::default(app, debug_level, prod_level)
+    let log_etc_path: PathBuf = "/var/local/etc".into();
+    let log_path: PathBuf = "/var/local/log".into();
+    logger_feature_with_path(
+        app,
+        debug_level,
+        prod_level,
+        log_etc_path.join(app),
+        log_path.join(app),
+    )
+}
+
+pub fn logger_feature_with_path(
+    app: &str,
+    debug_level: LevelFilter,
+    prod_level: LevelFilter,
+    log_etc_path: PathBuf,
+    log_path: PathBuf,
+) -> LoggerFeatureBuilder {
+    LoggerFeatureBuilder::default(
+        app,
+        debug_level,
+        prod_level,
+        log_etc_path.join(app),
+        log_path.join(app),
+    )
 }
 
 /// 自定义日志配置
