@@ -9,6 +9,10 @@ mod util_tls;
 mod util_tls_util;
 mod util_txrx;
 
+#[cfg(feature = "derive")]
+mod util_derive;
+#[cfg(feature = "derive")]
+pub use util_derive::*;
 pub use util_txrx::*;
 
 pub mod args {
