@@ -74,6 +74,16 @@ impl LoggerBuilder {
                 .write_mode(WriteMode::Direct),
         }
     }
+
+    pub fn log_to_stdout(self) {
+        Logger::with(self.log_spec_builder.build())
+            .format(colored_with_thread)
+            .write_mode(WriteMode::Direct)
+            .log_to_stdout()
+            .start()
+            .unwrap();
+    }
+
     pub fn build_with(self, format: FormatFunction, write_mode: WriteMode) -> LoggerBuilder2 {
         LoggerBuilder2 {
             logger: Logger::with(self.log_spec_builder.build())
@@ -89,15 +99,20 @@ pub struct LoggerBuilder3 {
     logger: Logger,
 }
 impl LoggerBuilder3 {
+    #[must_use]
     pub fn start(self) -> LoggerHandle {
         self.logger.start().unwrap()
     }
+    #[must_use]
     pub fn _start(self) -> Result<LoggerHandle> {
         Ok(self.logger.start()?)
     }
+
+    #[must_use]
     pub fn start_with_specfile(self, p: impl AsRef<Path>) -> LoggerHandle {
         self.logger.start_with_specfile(p).unwrap()
     }
+    #[must_use]
     pub fn start_with_specfile_default(self, app: &str) -> LoggerHandle {
         let path = PathBuf::from_str("/var/local/etc/")
             .unwrap()
@@ -219,6 +234,7 @@ impl LoggerFeatureBuilder {
         self
     }
     #[cfg(feature = "prod")]
+    #[must_use]
     pub fn build(self) -> LoggerHandle {
         let mut log_spec_builder = LogSpecBuilder::new();
         log_spec_builder.default(self._prod_level);
@@ -247,6 +263,7 @@ impl LoggerFeatureBuilder {
         }
     }
     #[cfg(not(feature = "prod"))]
+    #[must_use]
     pub fn build(self) -> LoggerHandle {
         let mut log_spec_builder = LogSpecBuilder::new();
         log_spec_builder.default(self._debug_level);

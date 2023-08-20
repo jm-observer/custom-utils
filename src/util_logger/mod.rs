@@ -7,11 +7,8 @@ mod builder;
 
 /// 简单，纯粹想输出日志而已。适用于临时
 /// 控制台输出日志
-pub fn logger_stdout(lever: LevelFilter) -> LoggerHandle {
+pub fn logger_stdout(lever: LevelFilter) -> LoggerBuilder {
     LoggerBuilder::default(lever)
-        .build_default()
-        .log_to_stdout()
-        .start()
 }
 pub fn logger_stdout_debug() {
     let _res = LoggerBuilder::default(LevelFilter::Debug)
