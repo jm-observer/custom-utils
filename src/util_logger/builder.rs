@@ -23,7 +23,7 @@ fn with_thread(
     let level = record.level();
     write!(
         w,
-        "[{}][{:>10}] {:>6} [{:>20}:{}] {}",
+        "[{}][{:10}] {:6} [{:30}:{}] {}",
         now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK),
         thread::current().name().unwrap_or("<unnamed>"),
         level.to_string(),
@@ -43,10 +43,10 @@ pub fn colored_with_thread(
         w,
         "{}",
         format_args!(
-            "[{}][{:>10}] {} [{:>20}:{}] {}",
+            "[{}][{:10}] {} [{:30}:{}] {}",
             now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK),
             thread::current().name().unwrap_or("<unnamed>"),
-            style(level).paint(format_args!("{:>6}", level.to_string()).to_string()),
+            style(level).paint(format_args!("{:6}", level.to_string()).to_string()),
             record.module_path().unwrap_or("<unnamed>"),
             record.line().unwrap_or(0),
             &record.args()
