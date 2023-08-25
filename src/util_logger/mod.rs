@@ -1,5 +1,4 @@
 use crate::util_logger::builder::{LoggerBuilder, LoggerFeatureBuilder};
-use flexi_logger::LoggerHandle;
 use log::LevelFilter;
 use std::path::PathBuf;
 
