@@ -15,6 +15,12 @@ pub fn logger_stdout_debug() {
         .log_to_stdout()
         ._start();
 }
+pub fn logger_stdout_info() {
+    let _res = LoggerBuilder::default(LevelFilter::Info)
+        .build_default()
+        .log_to_stdout()
+        ._start();
+}
 /// 根据feature来确定日志输出
 ///     dev：控制台输出
 ///     prod：在目录/var/local/log/{app}输出日志；
@@ -51,9 +57,4 @@ pub fn logger_feature_with_path(
         log_etc_path.join(app),
         log_path.join(app),
     )
-}
-
-/// 自定义日志配置
-pub fn custom_build(lever: LevelFilter) -> LoggerBuilder {
-    LoggerBuilder::default(lever)
 }

@@ -62,3 +62,16 @@ derive = ["syn"]
 name = "parse_derive"
 required-features = ["derive"]
 path = "examples/parse_derive.rs"
+
+[[example]]
+name = "self_sign_cert"
+required-features = ["tls-util"]
+[[example]]
+name = "timer"
+required-features = ["timer"]
+[[test]]
+name = "util_tls_util"
+required-features = ["tls_util"]
+[[test]]
+name = "util_tls_util_print"
+required-features = ["tls_util"]

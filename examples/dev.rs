@@ -1,6 +1,6 @@
 use custom_utils::logger;
 use custom_utils::logger::logger_stdout_debug;
-use log::LevelFilter::{Debug, Info};
+use log::LevelFilter::Debug;
 use log::{debug, error, info, warn};
 
 #[tokio::main]

@@ -1,12 +1,12 @@
 use flexi_logger::writers::LogWriter;
 use flexi_logger::Duplicate::Debug;
-use flexi_logger::{DeferredNow, FormatFunction, Logger};
+use flexi_logger::{DeferredNow, Logger};
 use log::{debug, info, Record};
 
 pub struct CustomWriter;
 
 impl LogWriter for CustomWriter {
-    fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
+    fn write(&self, _now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
         println!("[{}]", record.args().to_string());
         Ok(())
     }
@@ -19,7 +19,7 @@ impl LogWriter for CustomWriter {
 }
 
 fn main() {
-    let mut logger = Logger::try_with_str("info").unwrap();
+    let logger = Logger::try_with_str("info").unwrap();
     logger
         .log_to_writer(Box::new(CustomWriter))
         .duplicate_to_stdout(Debug)
