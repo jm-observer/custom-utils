@@ -1,4 +1,3 @@
-
 /// arg_value("--check", "-c")
 pub fn arg_value(long: &str, short: &str) -> Option<String> {
     assert!(long.starts_with("--"));
