@@ -34,13 +34,7 @@ pub fn logger_feature(
 ) -> LoggerFeatureBuilder {
     let log_etc_path: PathBuf = "/var/local/etc".into();
     let log_path: PathBuf = "/var/local/log".into();
-    logger_feature_with_path(
-        app,
-        debug_level,
-        prod_level,
-        log_etc_path.join(app),
-        log_path.join(app),
-    )
+    logger_feature_with_path(app, debug_level, prod_level, log_etc_path, log_path)
 }
 
 pub fn logger_feature_with_path(
@@ -50,11 +44,5 @@ pub fn logger_feature_with_path(
     log_etc_path: PathBuf,
     log_path: PathBuf,
 ) -> LoggerFeatureBuilder {
-    LoggerFeatureBuilder::default(
-        app,
-        debug_level,
-        prod_level,
-        log_etc_path.join(app),
-        log_path.join(app),
-    )
+    LoggerFeatureBuilder::default(app, debug_level, prod_level, log_etc_path, log_path)
 }

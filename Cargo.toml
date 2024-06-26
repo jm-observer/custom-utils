@@ -1,6 +1,6 @@
 [package]
 name = "custom-utils"
-version = "0.10.15"
+version = "0.10.16"
 edition = "2021"
 description = "Provide customized tools based on features"
 repository = "https://github.com/jm-observer/custom-utils.git"
@@ -15,35 +15,35 @@ include = [
 [dependencies]
 anyhow = "1.0"
 log = { version = "0.4" }
-tokio = {version ="1.18", features = ["signal", "rt-multi-thread", "macros", "time"], optional = true}
+tokio = { version = "1.18", features = ["signal", "rt-multi-thread", "macros", "time"], optional = true }
 # ------------- logger start----------------------
-flexi_logger = { version = "0.24", optional = true, features = ["specfile_without_notification", "specfile", "colors"], default-features = false }
-lazy_static = {version = "1.4", optional = true}
-ansi_term = {version = "0.12", optional = true}
+flexi_logger = { version = "0.28.5", optional = true, features = ["specfile_without_notification", "specfile", "colors"], default-features = false }
+lazy_static = { version = "1.4", optional = true }
+ansi_term = { version = "0.12", optional = true }
 # ------------- tls_util start----------------------
-picky = { version = "6.3", features = ["chrono_conversion"], optional = true}
-rsa =  { version = "0.6", optional = true}
-chrono = { version = "0.4", optional = true}
-rand = { version = "0.8.5", optional = true}
-der-parser = { version = "8", optional = true}
-x509-parser = { version ="0.13", features=["validate", "verify"],optional = true}
+picky = { version = "6.3", features = ["chrono_conversion"], optional = true }
+rsa = { version = "0.6", optional = true }
+chrono = { version = "0.4", optional = true }
+rand = { version = "0.8.5", optional = true }
+der-parser = { version = "8", optional = true }
+x509-parser = { version = "0.13", features = ["validate", "verify"], optional = true }
 # ------------- tls start----------------------
-rustls-pemfile = {version ="1", optional = true}
-rustls-native-certs = {version ="0.6", optional = true}
-rustls = {version ="0.20", optional = true}
+rustls-pemfile = { version = "1", optional = true }
+rustls-native-certs = { version = "0.6", optional = true }
+rustls = { version = "0.20", optional = true }
 # -----------------------------
-timer-util = {version ="0.3.2", optional = true}
+timer-util = { version = "0.3.2", optional = true }
 
-syn = { version = "2.0", features = ["extra-traits", "full"] , optional = true}
+syn = { version = "2.0", features = ["extra-traits", "full"], optional = true }
 
 # ------------- daemon start----------------------
 [target.'cfg(target_os="linux")'.dependencies]
-libsystemd = {version ="0.5.0", optional = true}
+libsystemd = { version = "0.5.0", optional = true }
 
 
 [dev-dependencies]
-picky = { version = "6.3", features = ["chrono_conversion"]}
-tokio = {version ="1.18", features = ["rt-multi-thread", "macros", "sync"]}
+picky = { version = "6.3", features = ["chrono_conversion"] }
+tokio = { version = "1.18", features = ["rt-multi-thread", "macros", "sync"] }
 
 
 [features]
@@ -53,7 +53,7 @@ prod = []
 tls = ["rustls-pemfile", "rustls-native-certs", "rustls"]
 tls-util = ["picky", "rsa", "chrono", "rand", "der-parser", "x509-parser"]
 logger = ["flexi_logger", "lazy_static", "ansi_term"]
-daemon-async = ["libsystemd","tokio"]
+daemon-async = ["libsystemd", "tokio"]
 daemon-sync = ["libsystemd"]
 timer = ["timer-util"]
 derive = ["syn"]
@@ -66,12 +66,16 @@ path = "examples/parse_derive.rs"
 [[example]]
 name = "self_sign_cert"
 required-features = ["tls-util"]
+path = "examples/self_sign_cert.rs"
 [[example]]
 name = "timer"
 required-features = ["timer"]
+path = "examples/timer.rs"
 [[test]]
 name = "util_tls_util"
 required-features = ["tls_util"]
+path = "tests/util_tls_util.rs"
 [[test]]
 name = "util_tls_util_print"
 required-features = ["tls_util"]
+path = "tests/util_tls_util_print.rs"

@@ -1,3 +1,5 @@
+#![allow(unused_imports, unused)]
+
 mod util_args;
 #[cfg(any(feature = "daemon-sync", feature = "daemon-async"))]
 mod util_daemon;

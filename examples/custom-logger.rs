@@ -26,5 +26,9 @@ fn main() {
         .start()
         .unwrap();
     info!("infsssssssssso");
+    log::info!("{}", 13);
     debug!("debssssssssssug");
+    debug!("iow");
+    println!("!!!");
+    print!("111");
 }

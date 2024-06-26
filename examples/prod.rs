@@ -1,7 +1,8 @@
 use custom_utils::logger::*;
 use log::warn;
+use log::LevelFilter::Debug;
 
 fn main() {
-    logger_stdout_debug();
+    let _ = logger_feature("a", Debug, Debug).build();
     warn!("warn");
 }
