@@ -1,7 +1,7 @@
 use ansi_term::{Color, Style};
 use anyhow::Result;
 use flexi_logger::writers::LogWriter;
-use flexi_logger::{Age, Duplicate, LogSpecification};
+use flexi_logger::{Age, Duplicate, FlexiLoggerError, LogSpecification};
 use flexi_logger::{Cleanup, Criterion, FileSpec, Naming};
 use flexi_logger::{
     DeferredNow, FormatFunction, LevelFilter, LogSpecBuilder, Logger, LoggerHandle, Record,
@@ -308,7 +308,20 @@ impl LoggerFeatureBuilder {
                 log_spec_builder.build()
             }
             DebugLevel::Env(default) => {
-                LogSpecification::env_or_parse(default).unwrap()
+                if let Some(env_val) = std::env::vars().find_map(|x| if x.0 == self._app {
+                    Some(x.1)
+                } else {
+                    None
+                }) {
+                    match LogSpecification::env_or_parse(env_val) {
+                        Ok(rs) => {rs}
+                        Err(_) => {
+                            LogSpecification::env_or_parse(default).unwrap()
+                        }
+                    }
+                } else {
+                    LogSpecification::env_or_parse(default).unwrap()
+                }
             }
         };
         if let Some(w) = self.writer {
