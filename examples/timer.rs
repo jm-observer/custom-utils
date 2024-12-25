@@ -1,11 +1,13 @@
-use custom_utils::logger::logger_stdout_debug;
 use custom_utils::timer::*;
+use log::debug;
 use std::time::Duration;
-use time::OffsetDateTime;
+use log::LevelFilter::Info;
+use custom_utils::logger;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    logger_stdout_debug();
+    let _ = logger::logger_feature("dev", "error,timer_util=debug", Info, false)
+        .build();
     let conf = configure_weekday(WeekDays::default_value(W6))
         .build_with_hours(Hours::default_all())
         .build_with_minuter(Minuters::default_array(&[M0, M10, M20, M30, M40, M50]))
@@ -16,9 +18,8 @@ async fn main() -> anyhow::Result<()> {
     let handle = tokio::spawn(async move {
         loop {
             let off_seconds = conf.next();
-            println!("next seconds: {}", off_seconds);
+            debug!("next seconds: {}", off_seconds);
             tokio::time::sleep(Duration::from_secs(off_seconds)).await;
-            println!("{:?}", OffsetDateTime::now_local().unwrap());
         }
     });
     handle.await.unwrap();

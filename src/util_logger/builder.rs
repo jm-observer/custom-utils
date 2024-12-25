@@ -1,7 +1,7 @@
 use ansi_term::{Color, Style};
 use anyhow::Result;
 use flexi_logger::writers::LogWriter;
-use flexi_logger::Age;
+use flexi_logger::{Age, Duplicate, LogSpecification};
 use flexi_logger::{Cleanup, Criterion, FileSpec, Naming};
 use flexi_logger::{
     DeferredNow, FormatFunction, LevelFilter, LogSpecBuilder, Logger, LoggerHandle, Record,
@@ -27,7 +27,7 @@ fn with_thread(
         now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK),
         thread::current().name().unwrap_or("<unnamed>"),
         level.to_string(),
-        record.module_path().unwrap_or("<unnamed>"),
+        record.target(),
         record.line().unwrap_or(0),
         &record.args()
     )
@@ -47,7 +47,29 @@ pub fn colored_with_thread(
             now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK),
             thread::current().name().unwrap_or("<unnamed>"),
             style(level).paint(format_args!("{:6}", level.to_string()).to_string()),
-            record.module_path().unwrap_or("<unnamed>"),
+            record.target(),
+            record.line().unwrap_or(0),
+            &record.args()
+        )
+    )
+}
+
+#[allow(dead_code)]
+pub fn colored_with_thread_target(
+    w: &mut dyn std::io::Write,
+    now: &mut DeferredNow,
+    record: &Record,
+) -> Result<(), std::io::Error> {
+    let level = record.level();
+    write!(
+        w,
+        "{}",
+        format_args!(
+            "[{}][{}][{:5}][{}:{}] {}",
+            now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK),
+            thread::current().name().unwrap_or("<unnamed>"),
+            style(level).paint(format_args!("{:6}", level.to_string()).to_string()),
+            record.target(),
             record.line().unwrap_or(0),
             &record.args()
         )
@@ -55,13 +77,17 @@ pub fn colored_with_thread(
 }
 
 pub struct LoggerBuilder {
+    display_target: bool,
     log_spec_builder: LogSpecBuilder,
 }
 impl LoggerBuilder {
     pub fn default(level: LevelFilter) -> Self {
         let mut log_spec_builder = LogSpecBuilder::new();
         log_spec_builder.default(level);
-        Self { log_spec_builder }
+        Self {
+            log_spec_builder,
+            display_target: false,
+        }
     }
     pub fn module<M: AsRef<str>>(mut self, module_name: M, lf: LevelFilter) -> Self {
         self.log_spec_builder.module(module_name, lf);
@@ -70,14 +96,22 @@ impl LoggerBuilder {
     pub fn build_default(self) -> LoggerBuilder2 {
         LoggerBuilder2 {
             logger: Logger::with(self.log_spec_builder.build())
-                .format(colored_with_thread)
+                .format(if self.display_target {
+                    colored_with_thread_target
+                } else {
+                    colored_with_thread
+                })
                 .write_mode(WriteMode::Direct),
         }
     }
 
     pub fn log_to_stdout(self) {
         Logger::with(self.log_spec_builder.build())
-            .format(colored_with_thread)
+            .format(if self.display_target {
+                colored_with_thread_target
+            } else {
+                colored_with_thread
+            })
             .write_mode(WriteMode::Direct)
             .log_to_stdout()
             .start()
@@ -166,7 +200,7 @@ impl LoggerBuilder2 {
 #[allow(dead_code)]
 pub struct LoggerFeatureBuilder {
     _app: String,
-    _debug_level: LevelFilter,
+    _debug_level: DebugLevel,
     _prod_level: LevelFilter,
     fs: FileSpec,
     criterion: Criterion,
@@ -180,7 +214,7 @@ pub struct LoggerFeatureBuilder {
 impl LoggerFeatureBuilder {
     pub fn default(
         app: &str,
-        _debug_level: LevelFilter,
+        _debug_level: DebugLevel,
         prod_level: LevelFilter,
         log_etc_path: PathBuf,
         log_path: PathBuf,
@@ -264,23 +298,31 @@ impl LoggerFeatureBuilder {
     #[cfg(not(feature = "prod"))]
     #[must_use]
     pub fn build(self) -> LoggerHandle {
-        let mut log_spec_builder = LogSpecBuilder::new();
-        log_spec_builder.default(self._debug_level);
-        for (module, level) in self.modules {
-            log_spec_builder.module(module, level);
-        }
+        let specification = match self._debug_level {
+            DebugLevel::Filter(debug_level) => {
+                let mut log_spec_builder = LogSpecBuilder::new();
+                log_spec_builder.default(debug_level);
+                for (module, level) in self.modules {
+                    log_spec_builder.module(module, level);
+                }
+                log_spec_builder.build()
+            }
+            DebugLevel::Env(default) => {
+                LogSpecification::env_or_parse(default).unwrap()
+            }
+        };
         if let Some(w) = self.writer {
             LoggerBuilder2 {
-                logger: Logger::with(log_spec_builder.build())
+                logger: Logger::with(specification)
                     .format(colored_with_thread)
                     .write_mode(WriteMode::Direct)
-                    .duplicate_to_stdout(self._debug_level.into()),
+                    .duplicate_to_stdout(Duplicate::All),
             }
             .log_to_writer(w)
             .start()
         } else {
             LoggerBuilder2 {
-                logger: Logger::with(log_spec_builder.build())
+                logger: Logger::with(specification)
                     .format(colored_with_thread)
                     .write_mode(WriteMode::Direct),
             }
@@ -321,5 +363,21 @@ impl Palette {
             debug: Style::default().fg(Color::Fixed(28)),
             trace: Style::default().fg(Color::Fixed(8)),
         }
+    }
+}
+
+pub enum  DebugLevel {
+    Filter(LevelFilter),
+    Env(String)
+}
+
+impl From<LevelFilter> for DebugLevel {
+    fn from(value: LevelFilter) -> Self {
+        Self::Filter(value)
+    }
+}
+impl From<&str> for DebugLevel {
+    fn from(value: &str) -> Self {
+        Self::Env(value.to_string())
     }
 }
