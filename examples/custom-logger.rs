@@ -7,7 +7,7 @@ pub struct CustomWriter;
 
 impl LogWriter for CustomWriter {
     fn write(&self, _now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
-        println!("[{}]", record.args().to_string());
+        println!("[{}]", record.args());
         Ok(())
     }
     fn flush(&self) -> std::io::Result<()> {

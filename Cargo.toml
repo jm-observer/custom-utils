@@ -1,6 +1,6 @@
 [package]
 name = "custom-utils"
-version = "0.10.17"
+version = "0.10.18"
 edition = "2021"
 description = "Provide customized tools based on features"
 repository = "https://github.com/jm-observer/custom-utils.git"
@@ -17,7 +17,7 @@ anyhow = "1.0"
 log = { version = "0.4" }
 tokio = { version = "1.18", features = ["signal", "rt-multi-thread", "macros", "time"], optional = true }
 # ------------- logger start----------------------
-flexi_logger = { version = "=0.29.8", optional = true, features = ["specfile_without_notification", "specfile", "colors"], default-features = false }
+flexi_logger = { version = "=0.29.8", optional = true, features = ["specfile_without_notification", "specfile", "colors", "async"], default-features = false }
 lazy_static = { version = "1.4", optional = true }
 ansi_term = { version = "0.12", optional = true }
 # ------------- tls_util start----------------------
@@ -36,7 +36,7 @@ timer-util = { version = "0.3.2", optional = true }
 
 syn = { version = "2.0", features = ["extra-traits", "full"], optional = true }
 
-home = "=0.5.9"
+home = "0.5.9"
 
 # ------------- daemon start----------------------
 [target.'cfg(target_os="linux")'.dependencies]

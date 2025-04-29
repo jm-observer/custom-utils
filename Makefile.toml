@@ -6,4 +6,4 @@ command = "cargo"
 args = ["run", "--example", "dev_win", "--features=dev,logger,daemon"]
 [tasks.prod]
 command = "cargo"
-args = ["check", "--example", "prod", "--features=prod,logger,daemon"]
+args = ["run", "--example", "prod", "--features=prod,logger"]

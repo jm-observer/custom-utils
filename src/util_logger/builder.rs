@@ -274,7 +274,7 @@ impl LoggerFeatureBuilder {
         for (module, level) in self.modules {
             log_spec_builder.module(module, level);
         }
-        let path = self.log_etc_path.join("logspecification.toml");
+        let path = self.log_etc_path.join(format!("{}.toml", self._app));
         if let Some(w) = self.writer {
             Logger::with(log_spec_builder.build())
                 .format(with_thread)
