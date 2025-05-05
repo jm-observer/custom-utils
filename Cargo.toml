@@ -1,6 +1,6 @@
 [package]
 name = "custom-utils"
-version = "0.10.18"
+version = "0.10.19"
 edition = "2021"
 description = "Provide customized tools based on features"
 repository = "https://github.com/jm-observer/custom-utils.git"

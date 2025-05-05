@@ -14,6 +14,8 @@ use std::thread;
 // #[cfg(feature = "prod")]
 const TS_DASHES_BLANK_COLONS_DOT_BLANK: &str = "%m-%d %H:%M:%S%.3f";
 
+const HOUR_MINUTER_SECONDE: &str = "%H:%M:%S%.3f";
+
 #[allow(dead_code)]
 fn with_thread(
     w: &mut dyn std::io::Write,
@@ -67,6 +69,28 @@ pub fn colored_with_thread_target(
         format_args!(
             "[{}][{}][{:5}][{}:{}] {}",
             now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK),
+            thread::current().name().unwrap_or("<unnamed>"),
+            style(level).paint(format_args!("{:6}", level.to_string()).to_string()),
+            record.target(),
+            record.line().unwrap_or(0),
+            &record.args()
+        )
+    )
+}
+
+#[allow(dead_code)]
+pub fn simple_colored_with_thread_target(
+    w: &mut dyn std::io::Write,
+    now: &mut DeferredNow,
+    record: &Record,
+) -> Result<(), std::io::Error> {
+    let level = record.level();
+    write!(
+        w,
+        "{}",
+        format_args!(
+            "[{}][{}][{:5}][{}:{}] {}",
+            now.format(HOUR_MINUTER_SECONDE),
             thread::current().name().unwrap_or("<unnamed>"),
             style(level).paint(format_args!("{:6}", level.to_string()).to_string()),
             record.target(),
@@ -308,16 +332,12 @@ impl LoggerFeatureBuilder {
                 log_spec_builder.build()
             }
             DebugLevel::Env(default) => {
-                if let Some(env_val) = std::env::vars().find_map(|x| if x.0 == self._app {
-                    Some(x.1)
-                } else {
-                    None
-                }) {
+                if let Some(env_val) =
+                    std::env::vars().find_map(|x| if x.0 == self._app { Some(x.1) } else { None })
+                {
                     match LogSpecification::env_or_parse(env_val) {
-                        Ok(rs) => {rs}
-                        Err(_) => {
-                            LogSpecification::env_or_parse(default).unwrap()
-                        }
+                        Ok(rs) => rs,
+                        Err(_) => LogSpecification::env_or_parse(default).unwrap(),
                     }
                 } else {
                     LogSpecification::env_or_parse(default).unwrap()
@@ -379,9 +399,9 @@ impl Palette {
     }
 }
 
-pub enum  DebugLevel {
+pub enum DebugLevel {
     Filter(LevelFilter),
-    Env(String)
+    Env(String),
 }
 
 impl From<LevelFilter> for DebugLevel {

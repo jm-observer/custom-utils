@@ -1,4 +1,6 @@
 use crate::util_logger::builder::{DebugLevel, LoggerBuilder, LoggerFeatureBuilder};
+use builder::{simple_colored_with_thread_target, LoggerBuilder2};
+use flexi_logger::{LogSpecBuilder, LogSpecification, Logger, LoggerHandle, WriteMode};
 use log::LevelFilter;
 use std::fs;
 use std::path::PathBuf;
@@ -7,9 +9,26 @@ mod builder;
 
 /// 简单，纯粹想输出日志而已。适用于临时
 /// 控制台输出日志
-pub fn logger_stdout(lever: LevelFilter) -> LoggerBuilder {
-    LoggerBuilder::default(lever)
+/// logger_stdout("info,custom_utils=warn")
+pub fn logger_stdout(level: impl Into<DebugLevel>) {
+    let specification = match level.into() {
+        DebugLevel::Filter(debug_level) => {
+            let mut log_spec_builder = LogSpecBuilder::new();
+            log_spec_builder.default(debug_level);
+            log_spec_builder.build()
+        }
+        DebugLevel::Env(default) => LogSpecification::env_or_parse(default).unwrap(),
+    };
+    Box::leak(Box::new(
+        Logger::with(specification)
+            .format(simple_colored_with_thread_target)
+            .write_mode(WriteMode::Direct)
+            .log_to_stdout()
+            .start()
+            .unwrap(),
+    ));
 }
+
 pub fn logger_stdout_debug() {
     let _res = LoggerBuilder::default(LevelFilter::Debug)
         .build_default()
@@ -22,6 +41,7 @@ pub fn logger_stdout_info() {
         .log_to_stdout()
         ._start();
 }
+
 ///
 /// let _ = custom_utils::logger::logger_feature("lapce", "warn,wgpu_core=error,lapce_app::keypress::loader=info", log::LevelFilter::Info, true)
 ///         .build();
@@ -50,7 +70,14 @@ pub fn logger_feature(
     if !log_path.exists() {
         std::fs::create_dir_all(&log_path);
     }
-    logger_feature_with_path(app, debug_level, prod_level, log_etc_path, log_etc_reset, log_path)
+    logger_feature_with_path(
+        app,
+        debug_level,
+        prod_level,
+        log_etc_path,
+        log_etc_reset,
+        log_path,
+    )
 }
 
 /// log_etc_reset 配置文件每次重启都重置
