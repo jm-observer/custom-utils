@@ -9,13 +9,11 @@ mod util_logger;
 mod util_tls;
 #[cfg(feature = "tls-util")]
 mod util_tls_util;
-mod util_txrx;
 
 #[cfg(feature = "derive")]
 mod util_derive;
 #[cfg(feature = "derive")]
 pub use util_derive::*;
-pub use util_txrx::*;
 
 pub mod args {
     pub use crate::util_args::*;
@@ -26,8 +24,12 @@ pub mod logger {
     pub use crate::util_logger::{
         logger_feature, logger_feature_with_path, logger_stdout, logger_stdout_debug,
     };
-    pub use flexi_logger::*;
-    pub use log::{debug, error, info, trace};
+    pub mod log {
+        pub use log::{debug, error, info, trace, warn};
+    }
+    pub mod flexi_logger {
+        pub use flexi_logger::*;
+    }
 }
 
 #[cfg(any(feature = "daemon-sync", feature = "daemon-async"))]
