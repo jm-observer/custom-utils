@@ -5,7 +5,7 @@ use std::thread;
 use std::time::Duration;
 
 fn main() {
-    let _logger = logger_feature("abc", Warn, Warn, false).build();
+    let _logger = logger_feature("abc", "info", Warn, false).build();
 
     loop {
         debug!("debug");

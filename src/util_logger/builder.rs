@@ -335,12 +335,15 @@ impl LoggerFeatureBuilder {
                 if let Some(env_val) =
                     std::env::vars().find_map(|x| if x.0 == self._app { Some(x.1) } else { None })
                 {
-                    match LogSpecification::env_or_parse(env_val) {
+                    match LogSpecification::parse(env_val) {
                         Ok(rs) => rs,
-                        Err(_) => LogSpecification::env_or_parse(default).unwrap(),
+                        Err(e) => {
+                            println!("{:?}", e);
+                            LogSpecification::env_or_parse(default).unwrap()
+                        }
                     }
                 } else {
-                    LogSpecification::env_or_parse(default).unwrap()
+                    LogSpecification::parse(default).unwrap()
                 }
             }
         };

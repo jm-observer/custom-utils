@@ -23,6 +23,7 @@ pub mod args {
 pub mod logger {
     pub use crate::util_logger::{
         logger_feature, logger_feature_with_path, logger_stdout, logger_stdout_debug,
+        logger_stdout_info,
     };
     pub mod log {
         pub use log::{debug, error, info, trace, warn};
