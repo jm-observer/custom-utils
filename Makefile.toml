@@ -13,4 +13,4 @@ command = "cargo"
 args = ["run", "--example", "prod", "--features=prod,logger"]
 [tasks.test_updater]
 command = "cargo"
-args = ["test", "-p", "custom-utils", "--features", "updater"]
+args = ["test", "-p", "custom-utils", "--features", "updater", "--", "--nocapture"]
