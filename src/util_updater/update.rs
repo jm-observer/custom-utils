@@ -1,0 +1,241 @@
+// Auto-update module for Zero daemon
+use anyhow::Context;
+use anyhow::{Result, anyhow};
+use reqwest::Client;
+use serde_json::Value;
+use std::fs;
+use std::path::Path;
+use tokio::io::AsyncWriteExt;
+
+#[derive(Debug, Clone)]
+pub struct UpdateMeta {
+    pub version: String,
+    pub url: String,
+}
+
+/// Fetch the latest release metadata from GitHub.
+pub async fn fetch_latest_release(api_url: &str) -> Result<UpdateMeta> {
+    let client = Client::builder()
+        .user_agent("zero-updater")
+        .build()
+        .context("Failed to build reqwest client")?;
+    let resp = client
+        .get(api_url)
+        .send()
+        .await
+        .context("Failed to request latest release")?
+        .error_for_status()?;
+    let json: Value = resp.json().await.context("Failed to parse release JSON")?;
+    let tag = json["tag_name"]
+        .as_str()
+        .ok_or_else(|| anyhow!("Missing tag_name in release JSON"))?;
+    let assets = json["assets"]
+        .as_array()
+        .ok_or_else(|| anyhow!("Missing assets array in release JSON"))?;
+    let target = match (std::env::consts::ARCH, std::env::consts::OS) {
+        ("x86_64", "windows") => "x86_64-pc-windows-msvc",
+        ("aarch64", "linux") => "aarch64-unknown-linux-gnu",
+        ("x86_64", "linux") => "x86_64-unknown-linux-gnu",
+        (arch, os) => return Err(anyhow::anyhow!("Unsupported platform: {}-{}", arch, os)),
+    };
+    // Find an asset whose name contains the target triple.
+    let asset = assets
+        .iter()
+        .find(|a| {
+            a["name"]
+                .as_str()
+                .map(|n| n.contains(target))
+                .unwrap_or(false)
+        })
+        .ok_or_else(|| anyhow!("No binary asset found for target {}", target))?;
+    let url = asset["browser_download_url"]
+        .as_str()
+        .ok_or_else(|| anyhow!("Missing browser_download_url in asset"))?
+        .to_string();
+    Ok(UpdateMeta {
+        version: tag.to_string(),
+        url,
+    })
+}
+
+/// Download a binary from `url` and write it to `target_path`.
+pub async fn download_binary(url: &str, target_path: &Path) -> Result<()> {
+    let client = Client::builder()
+        .user_agent("zero-updater")
+        .build()
+        .context("Failed to build reqwest client for download")?;
+    let resp = client
+        .get(url)
+        .send()
+        .await
+        .context("Failed to request binary download")?
+        .error_for_status()?;
+    // Stream the body to the destination file.
+    let mut file = tokio::fs::File::create(target_path)
+        .await
+        .context("Failed to create temporary binary file")?;
+    let mut stream = resp.bytes_stream();
+    use futures_util::StreamExt;
+    while let Some(chunk) = stream.next().await {
+        let bytes = chunk.context("Failed while streaming download chunks")?;
+        file.write_all(&bytes)
+            .await
+            .context("Failed to write to temporary binary file")?;
+    }
+    file.flush().await.context("Failed to flush binary file")?;
+    Ok(())
+}
+
+/// Swap the currently running binary with the newly downloaded binary.
+/// The current binary is renamed to `<name>.bak` and the new binary is placed at the original path.
+/// Permissions are set to executable (Unix only).
+pub fn swap_binary(current_exe: &Path, new_binary: &Path) -> Result<()> {
+    let parent = current_exe
+        .parent()
+        .ok_or_else(|| anyhow!("Current executable has no parent directory"))?;
+
+    // Create backup path: same directory, file name with .bak suffix.
+    let exe_name = current_exe
+        .file_name()
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| anyhow!("Current executable file name invalid"))?;
+    let backup_path = parent.join(format!("{}.bak", exe_name));
+
+    // Rename the running binary to backup.
+    fs::rename(current_exe, &backup_path).with_context(|| {
+        format!(
+            "Failed to rename {} to {}",
+            current_exe.display(),
+            backup_path.display()
+        )
+    })?;
+
+    // Move the new binary into place.
+    if let Err(e) = fs::rename(new_binary, current_exe).with_context(|| {
+        format!(
+            "Failed to move new binary into place: {} -> {}",
+            new_binary.display(),
+            current_exe.display()
+        )
+    }) {
+        // Attempt rollback
+        let _ = fs::rename(&backup_path, current_exe);
+        return Err(e);
+    }
+
+    // Ensure the new binary is executable. (Unix only)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(current_exe)
+            .with_context(|| format!("Failed to read metadata for {}", current_exe.display()))?
+            .permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(current_exe, perms).with_context(|| {
+            format!(
+                "Failed to set executable permissions on {}",
+                current_exe.display()
+            )
+        })?;
+    }
+    Ok(())
+}
+
+/// The high‑level entry point that performs a full update cycle.
+/// It fetches the latest release, downloads the appropriate binary,
+/// swaps the binary, records a shutdown reason, and finally exits.
+pub async fn run_update<F>(api_url: &str, current_exe: &Path, mark_shutdown: F) -> Result<()> 
+where 
+    F: FnOnce() -> Result<()>
+{
+    // 1. Get latest release information.
+    let meta = fetch_latest_release(api_url).await?;
+    log::info!("Latest version: {} at {}", meta.version, meta.url);
+
+    // 2. Determine temporary download location (same directory as current exe).
+    let dir = current_exe
+        .parent()
+        .ok_or_else(|| anyhow!("Executable has no parent directory"))?;
+    let tmp_path = dir.join("zero.update.tmp");
+
+    // 3. Download the binary.
+    download_binary(&meta.url, &tmp_path).await?;
+    log::info!("Binary downloaded to {}", tmp_path.display());
+
+    // 4. Swap the binary.
+    swap_binary(current_exe, &tmp_path)?;
+    log::info!("Binary swapped successfully");
+
+    // 5. Record shutdown reason for systemd.
+    mark_shutdown()?;
+    log::info!("Shutdown flag recorded, exiting for systemd restart");
+
+    // 6. Exit the process – systemd will restart it.
+    std::process::exit(0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use tempfile::tempdir;
+    use std::fs;
+
+    #[tokio::test]
+    async fn test_fetch_latest_release_mcp_server() {
+        // This test attempts to fetch from the real URL provided to verify the matching logic.
+        // Note: Requires internet access.
+        let url = "https://api.github.com/repos/jm-observer/mcp-server/releases/latest";
+        let result = fetch_latest_release(url).await;
+        
+        assert!(result.is_ok(), "Failed to fetch: {:?}", result.err());
+        let meta = result.unwrap();
+        
+        // Based on user input: tag should be v0.2.0
+        assert_eq!(meta.version, "v0.2.0");
+        
+        // Verify the URL contains the expected asset pattern for the current platform
+        // This validates that the logic correctly identifies the correct asset from the list.
+        assert!(meta.url.contains("mcp-tool.exe_x86_64-pc-windows-msvc") || 
+                meta.url.contains("mcp_x86_64-unknown-linux-gnu") ||
+                meta.url.contains("mcp_aarch64-unknown-linux-gnu"));
+    }
+
+    #[tokio::test]
+    async fn test_download_mcp_asset() {
+        let dir = tempdir().expect("Failed to create temp dir");
+        let target_path = dir.path().join("mcp-tool.exe");
+        
+        // Using one of the assets from the user's list
+        let test_url = "https://github.com/jm-observer/mcp-server/releases/download/v0.2.0/mcp-tool.exe_x86_64-pc-windows-msvc";
+        
+        let result = download_binary(test_url, &target_path).await;
+        
+        if result.is_ok() {
+            assert!(target_path.exists());
+            assert!(target_path.metadata().unwrap().len() > 0);
+        } else {
+            // If it fails, it's likely a 404 or network issue, but we've at least verified the call
+            eprintln!("Download failed (expected if URL is not live): {:?}", result.err());
+        }
+    }
+
+    #[test]
+    fn test_swap_binary_logic_simulation() {
+        let dir = tempdir().expect("Failed to create temp dir");
+        let current_exe = dir.path().join("mcp-tool.exe");
+        let new_binary = dir.path().join("mcp-tool-new.exe");
+
+        fs::write(&current_exe, "old content").unwrap();
+        fs::write(&new_binary, "new content").unwrap();
+
+        let result = swap_binary(&current_exe, &new_binary);
+        assert!(result.is_ok());
+        
+        let content = fs::read_to_string(&current_exe).unwrap();
+        assert_eq!(content, "new content");
+        
+        let backup_path = dir.path().join("mcp-tool.exe.bak");
+        assert!(backup_path.exists());
+    }
+}

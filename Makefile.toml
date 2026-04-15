@@ -1,3 +1,7 @@
+[config]
+#skip_core_tasks = true
+default_to_workspace = false
+
 [tasks.dev_unix]
 command = "cargo"
 args = ["run", "--example", "dev_unix", "--features=dev,logger,daemon"]
@@ -7,3 +11,6 @@ args = ["run", "--example", "dev_win", "--features=dev,logger,daemon"]
 [tasks.prod]
 command = "cargo"
 args = ["run", "--example", "prod", "--features=prod,logger"]
+[tasks.test_updater]
+command = "cargo"
+args = ["test", "-p", "custom-utils", "--features", "updater"]
