@@ -127,12 +127,7 @@ fn print_x509_extension(oid: &Oid, ext: &X509Extension) {
 }
 
 fn print_x509_digest_algorithm(alg: &AlgorithmIdentifier, level: usize) {
-    println!(
-        "{:indent$}Oid: {}",
-        "",
-        format_oid(&alg.algorithm),
-        indent = level
-    );
+    println!("{:indent$}Oid: {}", "", format_oid(&alg.algorithm), indent = level);
     if let Some(parameter) = &alg.parameters {
         let s = match parameter.tag() {
             Tag::Oid => {
@@ -290,9 +285,9 @@ fn print_x509_ski(public_key: &SubjectPublicKeyInfo) {
 fn format_number_to_hex_with_colon(b: &[u8], row_size: usize) -> Vec<String> {
     let mut v = Vec::with_capacity(1 + b.len() / row_size);
     for r in b.chunks(row_size) {
-        let s = r.iter().fold(String::with_capacity(3 * r.len()), |a, b| {
-            a + &format!("{:02x}:", b)
-        });
+        let s = r
+            .iter()
+            .fold(String::with_capacity(3 * r.len()), |a, b| a + &format!("{:02x}:", b));
         v.push(s)
     }
     v

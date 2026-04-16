@@ -1,7 +1,5 @@
 use anyhow::Result;
-use custom_utils::tls_util::{
-    gen_ca_cert, gen_cert_by_ca, gen_root_cert, gen_rsa_key_pem_and_file, gen_valid_date,
-};
+use custom_utils::tls_util::{gen_ca_cert, gen_cert_by_ca, gen_root_cert, gen_rsa_key_pem_and_file, gen_valid_date};
 use picky::x509::csr::Attribute;
 use picky::x509::date::UTCDate;
 use picky::x509::extension::KeyUsage;
@@ -13,11 +11,8 @@ use picky::{hash::HashAlgorithm, oids, signature::SignatureAlgorithm};
 fn test_tls() -> Result<()> {
     // let path: &Path = Path::new(".");
     // println!("{:?}", path.canonicalize().unwrap());
-    let (root_key, _) = gen_rsa_key_pem_and_file(
-        "./resource/certs/root_pri.key",
-        "./resource/certs/root_pub.key",
-    )
-    .unwrap();
+    let (root_key, _) =
+        gen_rsa_key_pem_and_file("./resource/certs/root_pri.key", "./resource/certs/root_pub.key").unwrap();
     let (intermediate_pri, _) = gen_rsa_key_pem_and_file(
         "./resource/certs/intermediate_pri.key",
         "./resource/certs/intermediate_pub.key",
@@ -30,13 +25,7 @@ fn test_tls() -> Result<()> {
     .unwrap();
 
     let (from_date, to_date) = gen_valid_date(3)?;
-    let root = gen_root_cert(
-        "MyRootCa",
-        from_date,
-        to_date,
-        &root_key,
-        "./resource/certs/root.crt",
-    )?;
+    let root = gen_root_cert("MyRootCa", from_date, to_date, &root_key, "./resource/certs/root.crt")?;
     assert_eq!(root.ty(), CertType::Root);
     let (from_date, to_date) = gen_valid_date(3)?;
     let intermediate = gen_ca_cert(
@@ -63,9 +52,7 @@ fn test_tls() -> Result<()> {
         ])
         .into_non_critical(),
         Extension::new_subject_alt_name(vec![
-            GeneralName::new_dns_name("www.localhost.com")
-                .unwrap()
-                .into(),
+            GeneralName::new_dns_name("www.localhost.com").unwrap().into(),
             GeneralName::new_dns_name("localhost.com").unwrap().into(),
         ])
         .into_non_critical(),

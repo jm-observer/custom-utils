@@ -1,13 +1,12 @@
+use custom_utils::logger;
 use custom_utils::timer::*;
 use log::debug;
-use std::time::Duration;
 use log::LevelFilter::Info;
-use custom_utils::logger;
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let _ = logger::logger_feature("dev", "error,timer_util=debug", Info, false)
-        .build();
+    let _ = logger::logger_feature("dev", "error,timer_util=debug", Info, false).build();
     let conf = configure_weekday(WeekDays::default_value(W6))
         .build_with_hours(Hours::default_all())
         .build_with_minuter(Minuters::default_array(&[M0, M10, M20, M30, M40, M50]))

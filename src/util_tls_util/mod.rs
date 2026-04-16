@@ -95,10 +95,7 @@ pub fn gen_ca_cert(
 ) -> Result<Cert> {
     let intermediate = CertificateBuilder::new()
         .validity(from_date, to_date)
-        .subject(
-            DirectoryName::new_common_name(subject_name),
-            ca_key.to_public_key(),
-        )
+        .subject(DirectoryName::new_common_name(subject_name), ca_key.to_public_key())
         .issuer_cert(super_ca, super_ca_key)
         .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256))
         .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
@@ -136,7 +133,6 @@ pub fn gen_valid_date(valid_year: u16) -> Result<(UTCDate, UTCDate)> {
     let now = Utc::now();
     let year = now.year() as u16 + valid_year;
     let from_date = UTCDate::from(now);
-    let to_date = UTCDate::ymd(year, now.month() as u8, now.day() as u8)
-        .ok_or(anyhow!("日期生成失败:{:?}", year))?;
+    let to_date = UTCDate::ymd(year, now.month() as u8, now.day() as u8).ok_or(anyhow!("日期生成失败:{:?}", year))?;
     Ok((from_date, to_date))
 }

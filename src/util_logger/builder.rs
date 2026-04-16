@@ -3,10 +3,7 @@ use anyhow::Result;
 use flexi_logger::writers::LogWriter;
 use flexi_logger::{Age, Duplicate, FlexiLoggerError, LogSpecification};
 use flexi_logger::{Cleanup, Criterion, FileSpec, Naming};
-use flexi_logger::{
-    DeferredNow, FormatFunction, LevelFilter, LogSpecBuilder, Logger, LoggerHandle, Record,
-    WriteMode,
-};
+use flexi_logger::{DeferredNow, FormatFunction, LevelFilter, LogSpecBuilder, Logger, LoggerHandle, Record, WriteMode};
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -17,11 +14,7 @@ const TS_DASHES_BLANK_COLONS_DOT_BLANK: &str = "%m-%d %H:%M:%S%.3f";
 const HOUR_MINUTER_SECONDE: &str = "%H:%M:%S%.3f";
 
 #[allow(dead_code)]
-fn with_thread(
-    w: &mut dyn std::io::Write,
-    now: &mut DeferredNow,
-    record: &Record,
-) -> Result<(), std::io::Error> {
+fn with_thread(w: &mut dyn std::io::Write, now: &mut DeferredNow, record: &Record) -> Result<(), std::io::Error> {
     let level = record.level();
     write!(
         w,
@@ -186,10 +179,7 @@ impl LoggerBuilder2 {
     }
     pub fn log_to_file_default(self, app: &str) -> LoggerBuilder3 {
         let fs_path = PathBuf::from_str("/var/local/log").unwrap().join(app);
-        let fs = FileSpec::default()
-            .directory(fs_path)
-            .basename(app)
-            .suffix("log");
+        let fs = FileSpec::default().directory(fs_path).basename(app).suffix("log");
         // 若为true，则会覆盖rotate中的数字、keep^
         self.log_to_file(
             fs,
@@ -244,10 +234,7 @@ impl LoggerFeatureBuilder {
         log_path: PathBuf,
     ) -> Self {
         // let fs_path = PathBuf::from_str("/var/local/log").unwrap().join(app);
-        let fs = FileSpec::default()
-            .directory(log_path)
-            .basename(app)
-            .suffix("log");
+        let fs = FileSpec::default().directory(log_path).basename(app).suffix("log");
         // 若为true，则会覆盖rotate中的数字、keep^
         let criterion = Criterion::AgeOrSize(Age::Day, 10_000_000);
         let naming = Naming::Numbers;
@@ -332,9 +319,7 @@ impl LoggerFeatureBuilder {
                 log_spec_builder.build()
             }
             DebugLevel::Env(default) => {
-                if let Some(env_val) =
-                    std::env::vars().find_map(|x| if x.0 == self._app { Some(x.1) } else { None })
-                {
+                if let Some(env_val) = std::env::vars().find_map(|x| if x.0 == self._app { Some(x.1) } else { None }) {
                     match LogSpecification::parse(env_val) {
                         Ok(rs) => rs,
                         Err(e) => {

@@ -1,9 +1,8 @@
-use log::debug;
 use custom_utils::parse_file;
+use log::debug;
 
 #[tokio::main]
 async fn main() {
-
     custom_utils::logger::logger_stdout_debug();
     let codes = r#"
 enum MergeEvent {
@@ -18,6 +17,4 @@ enum MergeEvent {
     Close(Close),
 }"#;
     debug!("{:?}", parse_file(codes).await.unwrap());
-
-
 }

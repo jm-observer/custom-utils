@@ -70,14 +70,7 @@ pub fn logger_feature(
     if !log_path.exists() {
         std::fs::create_dir_all(&log_path);
     }
-    logger_feature_with_path(
-        app,
-        debug_level,
-        prod_level,
-        log_etc_path,
-        log_etc_reset,
-        log_path,
-    )
+    logger_feature_with_path(app, debug_level, prod_level, log_etc_path, log_etc_reset, log_path)
 }
 
 /// log_etc_reset 配置文件每次重启都重置

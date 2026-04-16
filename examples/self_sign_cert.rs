@@ -68,9 +68,5 @@ pub fn main() {
         .build()
         .unwrap();
     let leaf_pem = signed_leaf.to_pem().unwrap();
-    std::fs::write(
-        "./resource/certs/self_signed/myhost.crt",
-        leaf_pem.to_string(),
-    )
-    .unwrap();
+    std::fs::write("./resource/certs/self_signed/myhost.crt", leaf_pem.to_string()).unwrap();
 }
