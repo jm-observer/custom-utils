@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "custom-utils"
-version = "0.11.2"
+version = "0.11.3"
 edition = "2021"
 description = "Provide customized tools based on features"
 repository = "https://github.com/jm-observer/custom-utils.git"
@@ -39,7 +39,7 @@ timer-util = { version = "0.3.2", optional = true }
 
 syn = { version = "2.0", features = ["extra-traits", "full"], optional = true }
 
-reqwest = { version = "0.11", features = ["json", "stream"] }
+reqwest = { version = "0.13", features = ["json", "stream"] }
 serde_json = "1.0"
 futures-util = "0.3"
 home = "0.5.12"
