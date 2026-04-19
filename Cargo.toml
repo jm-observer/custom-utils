@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "custom-utils"
-version = "0.11.3"
+version = "0.11.4"
 edition = "2021"
 description = "Provide customized tools based on features"
 repository = "https://github.com/jm-observer/custom-utils.git"
@@ -43,6 +43,7 @@ reqwest = { version = "0.13", features = ["json", "stream"] }
 serde_json = "1.0"
 futures-util = "0.3"
 home = "0.5.12"
+shellexpand = "3.1.2"
 
 # ------------- daemon start----------------------
 [target.'cfg(target_os="linux")'.dependencies]
@@ -61,7 +62,6 @@ prod = []
 derive = []
 tls = ["rustls-pemfile", "rustls-native-certs", "rustls"]
 tls-util = ["picky", "rsa", "chrono", "rand", "der-parser", "x509-parser"]
-tls_util = ["tls-util"]
 logger = ["flexi_logger", "lazy_static", "ansi_term"]
 daemon-async = ["libsystemd", "tokio"]
 daemon-sync = ["libsystemd"]
