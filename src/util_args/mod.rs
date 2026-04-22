@@ -43,32 +43,25 @@ pub fn get_user_home() -> anyhow::Result<PathBuf> {
 
 /// Expands path, supporting '~' for the user's home directory.
 pub fn expand_path(path: &str) -> anyhow::Result<PathBuf> {
-    #[cfg(not(windows))]
-    {
-        let expanded = shellexpand::tilde(path);
-        return Ok(PathBuf::from(expanded.into_owned()));
+    if let Some(stripped) = path.strip_prefix('~') {
+        let home = get_user_home()?;
+        // Remove leading separator if present to avoid join issues
+        let suffix = stripped.trim_start_matches(['/', '\\']);
+        return Ok(home.join(suffix));
     }
 
-    #[cfg(windows)]
-    {
-        if let Some(stripped) = path.strip_prefix('~') {
-            let home = get_user_home()?;
-            // Remove leading separator if present to avoid join issues
-            let suffix = stripped.trim_start_matches(['/', '\\']);
-            Ok(home.join(suffix))
-        } else if let Some(stripped) = path.strip_prefix("./").or_else(|| path.strip_prefix(".\\")) {
-            let current_dir = std::env::current_dir().context("Failed to get current directory")?;
-            // On Windows, if the remaining part starts with a separator,
-            // PathBuf::join might treat it as an absolute path from the drive root.
-            // We strip all leading separators to ensure it's joined as a relative path.
-            let suffix = stripped.trim_start_matches(['/', '\\']);
-            Ok(current_dir.join(suffix))
-        } else if path == "." {
-            std::env::current_dir().context("Failed to get current directory")
-        } else {
-            Ok(PathBuf::from(path))
-        }
+    if path == "." || path == "./" || path == ".\\" {
+        return std::env::current_dir().context("Failed to get current directory");
     }
+
+    if let Some(stripped) = path.strip_prefix("./").or_else(|| path.strip_prefix(".\\")) {
+        let current_dir = std::env::current_dir().context("Failed to get current directory")?;
+        let suffix = stripped.trim_start_matches(['/', '\\']);
+        return Ok(current_dir.join(suffix));
+    }
+
+    let expanded = shellexpand::tilde(path);
+    Ok(PathBuf::from(expanded.into_owned()))
 }
 
 /// $HOME/.config/app
@@ -105,5 +98,11 @@ mod tests {
         let cwd = std::env::current_dir().unwrap();
         let expanded = expand_path("./test").unwrap();
         assert_eq!(expanded, cwd.join("test"));
+    }
+
+    #[test]
+    fn test_expand_path_dot_only() {
+        let cwd = std::env::current_dir().unwrap();
+        assert_eq!(expand_path(".").unwrap(), cwd);
     }
 }
