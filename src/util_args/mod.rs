@@ -65,8 +65,10 @@ pub fn expand_path(path: &str) -> anyhow::Result<PathBuf> {
 }
 
 /// $HOME/.config/app
-pub fn workspace(workspace: &Option<String>, app: &str) -> anyhow::Result<PathBuf> {
-    let workspace = if let Some(workspace) = workspace {
+pub fn workspace(arg_workspace: &Option<String>, config_workspace: &Option<String>, app: &str) -> anyhow::Result<PathBuf> {
+    let workspace = if let Some(workspace) = arg_workspace {
+        expand_path(workspace)?
+    } else if let Some(workspace) = config_workspace {
         expand_path(workspace)?
     } else {
         get_user_home()?.join(".config").join(app)
