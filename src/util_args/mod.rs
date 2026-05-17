@@ -69,7 +69,11 @@ pub fn workspace(arg_workspace: &Option<String>, app: &str) -> anyhow::Result<Pa
     workspace_with_config(arg_workspace, &None, app)
 }
 /// $HOME/.config/app
-pub fn workspace_with_config(arg_workspace: &Option<String>, config_workspace: &Option<String>, app: &str) -> anyhow::Result<PathBuf> {
+pub fn workspace_with_config(
+    arg_workspace: &Option<String>,
+    config_workspace: &Option<String>,
+    app: &str,
+) -> anyhow::Result<PathBuf> {
     let workspace = if let Some(workspace) = arg_workspace {
         expand_path(workspace)?
     } else if let Some(workspace) = config_workspace {
