@@ -55,3 +55,8 @@ pub mod timer {
 
 #[cfg(feature = "updater")]
 pub mod util_updater;
+
+#[cfg(feature = "updater")]
+pub mod updater {
+    pub use crate::util_updater::*;
+}

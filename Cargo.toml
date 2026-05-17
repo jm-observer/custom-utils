@@ -67,6 +67,7 @@ daemon-async = ["libsystemd", "tokio"]
 daemon-sync = ["libsystemd"]
 timer = ["timer-util"]
 updater = ["tokio"]
+updater-systemd = ["updater"]
 
 [[example]]
 name = "parse_derive"
