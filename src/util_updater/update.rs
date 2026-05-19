@@ -37,6 +37,9 @@ pub struct UpdateConfig {
     force: bool,
     /// Override the auto-detected Rust target triple used for asset matching.
     target_triple: Option<String>,
+    /// Directory the binaries are installed into. `None` => the directory of
+    /// the current executable.
+    install_dir: Option<PathBuf>,
 }
 
 /// Result of an [`UpdateConfig::execute`] run.
@@ -66,6 +69,7 @@ impl UpdateConfig {
             current_version: current_version.into(),
             force: false,
             target_triple: None,
+            install_dir: None,
         }
     }
 
@@ -97,6 +101,15 @@ impl UpdateConfig {
         self
     }
 
+    /// Install the downloaded binaries into `dir` instead of the directory of
+    /// the current executable. Used when the running process and the deployed
+    /// binary live in different locations (e.g. a systemd service whose binary
+    /// is under `~/.local/bin`).
+    pub fn install_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.install_dir = Some(dir.into());
+        self
+    }
+
     /// Fetch the latest release, and if it is newer (or `force`), download and
     /// swap the primary binary plus every `extra_bins` entry in place.
     pub async fn execute(&self) -> Result<UpdateOutcome> {
@@ -107,10 +120,13 @@ impl UpdateConfig {
         };
 
         let exe = std::env::current_exe().context("Failed to resolve current executable path")?;
-        let dir = exe
-            .parent()
-            .ok_or_else(|| anyhow!("Current executable has no parent directory"))?
-            .to_path_buf();
+        let dir = match &self.install_dir {
+            Some(dir) => dir.clone(),
+            None => exe
+                .parent()
+                .ok_or_else(|| anyhow!("Current executable has no parent directory"))?
+                .to_path_buf(),
+        };
         let primary = match &self.bin_name {
             Some(name) => name.clone(),
             None => exe
@@ -337,6 +353,15 @@ mod tests {
         assert!(!is_newer("v0.1.0", "0.2.0"));
         // Pre-release / build suffixes are ignored for the numeric compare.
         assert!(!is_newer("1.2.3-rc1", "1.2.3"));
+    }
+
+    #[test]
+    fn install_dir_overrides_target_directory() {
+        let cfg = UpdateConfig::new("o", "r", "1.0.0").install_dir("/tmp/bins");
+        assert_eq!(cfg.install_dir.as_deref(), Some(Path::new("/tmp/bins")));
+
+        let cfg = UpdateConfig::new("o", "r", "1.0.0");
+        assert_eq!(cfg.install_dir, None);
     }
 
     #[test]

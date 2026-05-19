@@ -1,7 +1,7 @@
 #![allow(unused_imports, unused)]
 
 mod util_args;
-#[cfg(any(feature = "daemon-sync", feature = "daemon-async"))]
+#[cfg(any(feature = "daemon-sync", feature = "daemon-async", feature = "updater"))]
 mod util_daemon;
 #[cfg(feature = "logger")]
 mod util_logger;
@@ -32,7 +32,7 @@ pub mod logger {
     }
 }
 
-#[cfg(any(feature = "daemon-sync", feature = "daemon-async"))]
+#[cfg(any(feature = "daemon-sync", feature = "daemon-async", feature = "updater"))]
 pub mod daemon {
     pub use crate::util_daemon::daemon;
 }
