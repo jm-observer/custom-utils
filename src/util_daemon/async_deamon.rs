@@ -13,6 +13,12 @@ pub fn daemon() -> JoinHandle<()> {
             info!("Not running systemd, early exit.");
             return;
         };
+        // `Type=notify` units must receive `READY=1` to become active. Send it
+        // before the watchdog-enabled check so readiness never depends on
+        // `WatchdogSec=` being set, otherwise the unit start always times out.
+        if let Err(err) = daemon::notify(false, &[NotifyState::Ready]) {
+            error!("daemon ready notify error: {}", err);
+        }
         let timeout = match daemon::watchdog_enabled(true) {
             Some(time) => time,
             None => {
