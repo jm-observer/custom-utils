@@ -48,8 +48,9 @@ pub struct ServiceConfig {
     /// `WorkingDirectory`. `None` => `<home>/.config/<name>`.
     workspace: Option<PathBuf>,
     restart_sec: u32,
-    /// When set, the unit uses `Type=notify` + `WatchdogSec=` so the
-    /// [`crate::daemon::daemon`] heartbeat is actually honored by systemd.
+    /// Opt-in `WatchdogSec=`. The unit is `Type=notify` regardless; when this
+    /// is set, a stalled [`crate::daemon::daemon`] heartbeat additionally gets
+    /// the service killed and restarted by systemd.
     watchdog_sec: Option<u32>,
 }
 
@@ -129,9 +130,9 @@ impl ServiceConfig {
         self
     }
 
-    /// Enable the systemd watchdog: the unit becomes `Type=notify` with
-    /// `WatchdogSec=<secs>`, so the [`crate::daemon::daemon`] heartbeat keeps
-    /// the service alive instead of being a no-op.
+    /// Opt into watchdog supervision by adding `WatchdogSec=<secs>`. The unit
+    /// is `Type=notify` by default; this only adds the liveness timer so a
+    /// stalled [`crate::daemon::daemon`] heartbeat triggers a restart.
     pub fn watchdog_sec(mut self, secs: u32) -> Self {
         self.watchdog_sec = Some(secs);
         self
@@ -187,9 +188,14 @@ impl ServiceConfig {
         } else {
             format!("{bin} {exec_args}")
         };
-        let (svc_type, watchdog_line) = match self.watchdog_sec {
-            Some(secs) => ("notify", format!("WatchdogSec={secs}\n")),
-            None => ("simple", String::new()),
+        // `Type=notify` is the default: the deploy stack always spawns the
+        // readiness task ([`crate::daemon::daemon`]) which sends `READY=1`, so
+        // systemd gets correct start ordering. `WatchdogSec=` is opt-in
+        // (`watchdog_sec`): only then does a stalled heartbeat kill the service.
+        let svc_type = "notify";
+        let watchdog_line = match self.watchdog_sec {
+            Some(secs) => format!("WatchdogSec={secs}\n"),
+            None => String::new(),
         };
         // No User=/Group=: a `systemctl --user` unit always runs as the
         // owning user; `WantedBy=default.target` is the user-bus analogue of
@@ -396,14 +402,14 @@ mod tests {
     }
 
     #[test]
-    fn no_watchdog_is_type_simple() {
+    fn default_is_type_notify_without_watchdogsec() {
         let unit = cfg("svc").generate_unit().unwrap();
-        assert!(unit.contains("Type=simple"));
+        assert!(unit.contains("Type=notify"));
         assert!(!unit.contains("WatchdogSec="));
     }
 
     #[test]
-    fn watchdog_switches_type_notify_and_adds_watchdogsec() {
+    fn watchdog_sec_adds_watchdogsec_keeping_type_notify() {
         let unit = cfg("svc").watchdog_sec(30).generate_unit().unwrap();
         assert!(unit.contains("Type=notify"));
         assert!(unit.contains("WatchdogSec=30\n"));

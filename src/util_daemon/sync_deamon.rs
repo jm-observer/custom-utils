@@ -1,10 +1,10 @@
 use std::thread::JoinHandle;
 
-#[cfg(not(all(target_os = "linux", feature = "prod")))]
+#[cfg(not(target_os = "linux"))]
 pub fn daemon() -> JoinHandle<()> {
     std::thread::spawn(|| {})
 }
-#[cfg(all(target_os = "linux", feature = "prod"))]
+#[cfg(target_os = "linux")]
 pub fn daemon() -> JoinHandle<()> {
     std::thread::spawn(|| {
         use libsystemd::daemon::{self, NotifyState};
@@ -14,6 +14,12 @@ pub fn daemon() -> JoinHandle<()> {
             info!("Not running systemd, early exit.");
             return;
         };
+        // `Type=notify` units must receive `READY=1` to become active. Send it
+        // before the watchdog-enabled check so readiness never depends on
+        // `WatchdogSec=` being set, otherwise the unit start always times out.
+        if let Err(err) = daemon::notify(false, &[NotifyState::Ready]) {
+            error!("daemon ready notify error: {:?}", err);
+        }
         let timeout = match daemon::watchdog_enabled(true) {
             Some(time) => time,
             None => {

@@ -1,10 +1,10 @@
 use tokio::task::JoinHandle;
 
-#[cfg(not(all(target_os = "linux", feature = "prod")))]
+#[cfg(not(target_os = "linux"))]
 pub fn daemon() -> JoinHandle<()> {
     tokio::spawn(async move {})
 }
-#[cfg(all(target_os = "linux", feature = "prod"))]
+#[cfg(target_os = "linux")]
 pub fn daemon() -> JoinHandle<()> {
     tokio::spawn(async move {
         use libsystemd::daemon::{self, NotifyState};

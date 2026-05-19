@@ -169,8 +169,10 @@ impl LinuxService {
         self
     }
 
-    /// Enable the systemd watchdog (`Type=notify` + `WatchdogSec=<secs>`), so a
-    /// spawned [`Self::spawn_watchdog`] heartbeat actually keeps the service up.
+    /// Opt into systemd watchdog supervision: adds `WatchdogSec=<secs>` to the
+    /// unit so a stalled [`Self::spawn_watchdog`] heartbeat gets the service
+    /// killed and restarted. The unit is `Type=notify` regardless (the default
+    /// since 0.14); this only adds the liveness timer on top.
     pub fn watchdog_sec(mut self, secs: u32) -> Self {
         self.watchdog_sec = Some(secs);
         self
@@ -331,9 +333,11 @@ impl LinuxService {
         }
     }
 
-    /// Spawn the systemd watchdog heartbeat. No-op unless built on Linux with
-    /// the `prod` feature; pair with [`Self::watchdog_sec`] so the unit declares
-    /// `WatchdogSec=`.
+    /// Spawn the systemd readiness/watchdog task. On Linux it sends `READY=1`
+    /// (required for the `Type=notify` default) and, when the unit declares
+    /// `WatchdogSec=` (see [`Self::watchdog_sec`]), keeps pinging the watchdog;
+    /// it self-disables when not run under systemd. A no-op on non-Linux.
+    /// Call this early in the service's main so readiness is signalled.
     pub fn spawn_watchdog(&self) -> tokio::task::JoinHandle<()> {
         crate::util_daemon::daemon()
     }
