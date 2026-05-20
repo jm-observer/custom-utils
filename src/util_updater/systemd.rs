@@ -181,6 +181,7 @@ impl ServiceConfig {
         // The unit is a Linux deployment artifact; emit POSIX separators even
         // when `generate_unit` is run on Windows for a dry-run preview.
         let workspace = posix(&r.workspace);
+        let bin_dir = posix(&r.bin_dir);
         let bin = posix(&r.bin_dir.join(&self.name));
         let exec_args = self.exec_args.replace("{workspace}", &workspace);
         let exec_start = if exec_args.is_empty() {
@@ -197,6 +198,17 @@ impl ServiceConfig {
             Some(secs) => format!("WatchdogSec={secs}\n"),
             None => String::new(),
         };
+        // Self-consistent PATH: include the resolved `bin_dir` so the service
+        // can spawn sibling binaries (e.g. tool helpers shipped under
+        // `.binaries(...)`) by bare name. systemd's user manager does not
+        // forward the login shell's PATH and `Environment=` does not expand
+        // `$PATH`, so the standard system paths are listed as literals. Using
+        // the resolved `bin_dir` rather than the systemd `%h/.local/bin`
+        // specifier keeps the PATH correct when `.bin_dir(..)` overrides the
+        // default. See ADR 2026-05-20-zero-service-path-alarm-cli-enoent.md
+        // (zero) for the discovery that motivated this.
+        let path_line =
+            format!("Environment=PATH={bin_dir}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n");
         // No User=/Group=: a `systemctl --user` unit always runs as the
         // owning user; `WantedBy=default.target` is the user-bus analogue of
         // `multi-user.target`.
@@ -207,6 +219,7 @@ impl ServiceConfig {
              \n\
              [Service]\n\
              Type={svc_type}\n\
+             {path_line}\
              ExecStart={exec_start}\n\
              Restart=on-failure\n\
              RestartSec={restart_sec}\n\
@@ -217,6 +230,7 @@ impl ServiceConfig {
              WantedBy=default.target\n",
             description = self.description,
             svc_type = svc_type,
+            path_line = path_line,
             exec_start = exec_start,
             restart_sec = self.restart_sec,
             watchdog_line = watchdog_line,
@@ -399,6 +413,26 @@ mod tests {
             .unwrap();
         assert!(unit.contains("ExecStart=/opt/svc/bin/svc -w /var/lib/svc"));
         assert!(unit.contains("WorkingDirectory=/var/lib/svc"));
+        // PATH must follow the overridden bin_dir, not the default ~/.local/bin.
+        assert!(unit
+            .contains("Environment=PATH=/opt/svc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"));
+    }
+
+    #[test]
+    fn unit_environment_path_includes_bin_dir() {
+        // Default bin_dir is <home>/.local/bin; PATH must start with it so
+        // sibling binaries shipped via `.binaries(...)` can be spawned by bare
+        // name (regression guard for "alarm-cli ENOENT under zero service").
+        let unit = cfg("alarm-server").generate_unit().unwrap();
+        assert!(unit.contains(
+            "Environment=PATH=/home/alarm/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"
+        ));
+        // The PATH line must sit in the [Service] section, before ExecStart
+        // (Environment= applies to ExecStart so order matters for readability,
+        // not semantics; this assertion freezes the documented layout).
+        let env_idx = unit.find("Environment=PATH=").expect("PATH line present");
+        let exec_idx = unit.find("ExecStart=").expect("ExecStart present");
+        assert!(env_idx < exec_idx);
     }
 
     #[test]
