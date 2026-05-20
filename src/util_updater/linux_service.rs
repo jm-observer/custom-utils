@@ -284,7 +284,11 @@ impl LinuxService {
                 log::info!("update: {outcome:?}");
                 Ok(CliAction::Handled)
             }
-            DeployCommand::Version => Ok(CliAction::Version(self.version.clone())),
+            DeployCommand::Version => Ok(CliAction::Version(format!(
+                "{} (built {})",
+                self.version,
+                env!("CUSTOM_UTILS_BUILD_DATE")
+            ))),
             DeployCommand::Help => Ok(CliAction::Help(self.deploy_usage())),
         }
     }

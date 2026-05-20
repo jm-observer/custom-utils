@@ -13,7 +13,7 @@ license-file = "LICENSE"
 readme = "README.md"
 
 include = [
-    "Makefile.toml", "LICENSE", "Cargo.toml", "README.md", "src/**/*.rs"
+    "Makefile.toml", "LICENSE", "Cargo.toml", "README.md", "build.rs", "src/**/*.rs"
 ]
 
 [dependencies]
