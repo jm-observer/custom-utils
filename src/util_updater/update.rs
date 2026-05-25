@@ -238,8 +238,14 @@ async fn fetch_latest_release(client: &Client, api_url: &str) -> Result<(String,
     Ok((tag, assets))
 }
 
-/// Find a `browser_download_url` for an asset whose name contains both the
-/// binary name and the target triple.
+/// Find the API URL for an asset whose name contains both the binary name and
+/// the target triple.
+///
+/// Returns `asset["url"]` (the `…/releases/assets/<id>` endpoint) rather than
+/// `browser_download_url`. The API endpoint, when paired with
+/// `Accept: application/octet-stream`, works for private repos: GitHub issues
+/// a short-lived signed CDN URL on redirect, so the caller's `Authorization`
+/// header doesn't need to survive the cross-host hop (reqwest strips it).
 fn find_asset_url(assets: &Value, bin: &str, target: &str) -> Result<String> {
     let list = assets
         .as_array()
@@ -251,18 +257,24 @@ fn find_asset_url(assets: &Value, bin: &str, target: &str) -> Result<String> {
             name.contains(bin) && name.contains(target)
         })
         .ok_or_else(|| anyhow!("No matching asset (bin '{bin}', target '{target}')"))?;
-    asset["browser_download_url"]
+    asset["url"]
         .as_str()
         .map(str::to_string)
-        .ok_or_else(|| anyhow!("Asset is missing browser_download_url"))
+        .ok_or_else(|| anyhow!("Asset is missing API url"))
 }
 
 /// Stream the response body at `url` into `path`.
+///
+/// Explicitly sets `Accept: application/octet-stream` so the GitHub Releases
+/// API assets endpoint redirects to the binary blob instead of returning the
+/// asset metadata JSON (the default `application/vnd.github+json` from
+/// `build_client`).
 async fn download_to(client: &Client, url: &str, path: &Path) -> Result<()> {
     use futures_util::StreamExt;
 
     let resp = client
         .get(url)
+        .header(ACCEPT, HeaderValue::from_static("application/octet-stream"))
         .send()
         .await
         .context("Failed to request binary download")?
@@ -368,16 +380,46 @@ mod tests {
     fn asset_matching_picks_bin_and_target() {
         let assets = json!([
             { "name": "alarm-server-x86_64-pc-windows-msvc.exe",
+              "url": "https://api.github.com/repos/o/r/releases/assets/1",
               "browser_download_url": "https://example.com/server-win" },
             { "name": "alarm-cli-x86_64-pc-windows-msvc.exe",
+              "url": "https://api.github.com/repos/o/r/releases/assets/2",
               "browser_download_url": "https://example.com/cli-win" },
             { "name": "alarm-cli-aarch64-unknown-linux-gnu",
+              "url": "https://api.github.com/repos/o/r/releases/assets/3",
               "browser_download_url": "https://example.com/cli-linux" },
         ]);
         let url = find_asset_url(&assets, "alarm-cli", "x86_64-pc-windows-msvc").unwrap();
-        assert_eq!(url, "https://example.com/cli-win");
+        assert_eq!(url, "https://api.github.com/repos/o/r/releases/assets/2");
 
         assert!(find_asset_url(&assets, "alarm-cli", "riscv64-unknown-linux-gnu").is_err());
+    }
+
+    #[tokio::test]
+    async fn download_to_sets_octet_stream_accept() {
+        use wiremock::matchers::{header, method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        let body: Vec<u8> = (0u8..=255).cycle().take(4096).collect();
+
+        Mock::given(method("GET"))
+            .and(path("/asset"))
+            .and(header("accept", "application/octet-stream"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(body.clone()))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let client = build_client().unwrap();
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("payload.bin");
+
+        download_to(&client, &format!("{}/asset", server.uri()), &dest)
+            .await
+            .unwrap();
+
+        assert_eq!(fs::read(&dest).unwrap(), body);
     }
 
     #[test]
