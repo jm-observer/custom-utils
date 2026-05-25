@@ -79,6 +79,13 @@ Always use the async `Client`; never the blocking API.
 
 **Logging:** Use `log` macros (`info!`, `error!`, etc.). Initialize with `custom_utils::logger::logger_feature`. No `println!` for application logs.
 
-## CI / Release
+## Release
 
-Build targets: `x86_64-pc-windows-msvc`, `aarch64-unknown-linux-gnu`. Pushing a `v*` tag triggers the GitHub Release workflow. Confirm the fix loop passes locally before pushing a release tag.
+No CI is configured in this repo — releases are manual. Confirm the fix loop (clippy + fmt + test) passes locally, then:
+
+```bash
+# bump version in Cargo.toml, commit
+git tag -a vX.Y.Z -m "vX.Y.Z: <summary>"
+git push origin main && git push origin vX.Y.Z
+cargo publish    # required — downstream (zero / zero-nova) pulls from crates.io, not git
+```
