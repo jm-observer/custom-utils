@@ -215,16 +215,19 @@ fn exe_suffix() -> &'static str {
 
 /// Returns `(tag_name, assets_array)` from a GitHub release JSON document.
 async fn fetch_latest_release(client: &Client, api_url: &str) -> Result<(String, Value)> {
-    let json: Value = client
-        .get(api_url)
-        .send()
-        .await
-        .context("Failed to request latest release")?
-        .error_for_status()
-        .context("GitHub returned an error status for the release request")?
-        .json()
-        .await
-        .context("Failed to parse release JSON")?;
+    let json: Value = with_retry("fetch latest release", is_transient_reqwest, || async {
+        client
+            .get(api_url)
+            .send()
+            .await
+            .context("Failed to request latest release")?
+            .error_for_status()
+            .context("GitHub returned an error status for the release request")?
+            .json()
+            .await
+            .context("Failed to parse release JSON")
+    })
+    .await?;
 
     let tag = json["tag_name"]
         .as_str()
@@ -272,24 +275,27 @@ fn find_asset_url(assets: &Value, bin: &str, target: &str) -> Result<String> {
 async fn download_to(client: &Client, url: &str, path: &Path) -> Result<()> {
     use futures_util::StreamExt;
 
-    let resp = client
-        .get(url)
-        .header(ACCEPT, HeaderValue::from_static("application/octet-stream"))
-        .send()
-        .await
-        .context("Failed to request binary download")?
-        .error_for_status()
-        .context("Download request returned an error status")?;
-    let mut file = tokio::fs::File::create(path)
-        .await
-        .with_context(|| format!("Failed to create temp file {}", path.display()))?;
-    let mut stream = resp.bytes_stream();
-    while let Some(chunk) = stream.next().await {
-        let bytes = chunk.context("Failed while streaming download")?;
-        file.write_all(&bytes).await.context("Failed to write download chunk")?;
-    }
-    file.flush().await.context("Failed to flush download")?;
-    Ok(())
+    with_retry("download asset", is_transient_reqwest, || async {
+        let resp = client
+            .get(url)
+            .header(ACCEPT, HeaderValue::from_static("application/octet-stream"))
+            .send()
+            .await
+            .context("Failed to request binary download")?
+            .error_for_status()
+            .context("Download request returned an error status")?;
+        let mut file = tokio::fs::File::create(path)
+            .await
+            .with_context(|| format!("Failed to create temp file {}", path.display()))?;
+        let mut stream = resp.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let bytes = chunk.context("Failed while streaming download")?;
+            file.write_all(&bytes).await.context("Failed to write download chunk")?;
+        }
+        file.flush().await.context("Failed to flush download")?;
+        Ok(())
+    })
+    .await
 }
 
 /// Move `new_binary` to `dest`. If `dest` exists it is renamed to `<dest>.bak`
@@ -347,6 +353,51 @@ fn parse_version(v: &str) -> Vec<u64> {
         .split('.')
         .map(|p| p.parse::<u64>().unwrap_or(0))
         .collect()
+}
+
+/// Backoff schedule between retries, in milliseconds.
+/// Total max wait: 500 + 1500 = 2s across at most 3 attempts.
+const RETRY_BACKOFFS_MS: &[u64] = &[500, 1500];
+
+/// Retry an async operation up to `RETRY_BACKOFFS_MS.len() + 1` times, sleeping
+/// the corresponding backoff between attempts. Only retries when `should_retry`
+/// returns true; non-retryable errors are returned immediately.
+async fn with_retry<F, Fut, T>(label: &str, should_retry: fn(&anyhow::Error) -> bool, mut f: F) -> Result<T>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<T>>,
+{
+    let mut attempt = 0u32;
+    loop {
+        match f().await {
+            Ok(v) => return Ok(v),
+            Err(e) => {
+                let backoff = RETRY_BACKOFFS_MS.get(attempt as usize).copied();
+                let Some(backoff) = backoff else {
+                    return Err(e);
+                };
+                if !should_retry(&e) {
+                    return Err(e);
+                }
+                log::warn!("{label} attempt {} failed: {e:#}; retrying in {backoff}ms", attempt + 1);
+                tokio::time::sleep(std::time::Duration::from_millis(backoff)).await;
+                attempt += 1;
+            }
+        }
+    }
+}
+
+/// True iff the error chain contains a `reqwest::Error` whose failure mode is
+/// network-layer (connect / timeout / request build / streamed body), as
+/// opposed to an HTTP status (4xx/5xx, not transient: auth, not-found) or a
+/// decode error (malformed response, not transient).
+fn is_transient_reqwest(err: &anyhow::Error) -> bool {
+    err.chain().any(|cause| {
+        cause
+            .downcast_ref::<reqwest::Error>()
+            .map(|re| re.is_connect() || re.is_timeout() || re.is_request() || re.is_body())
+            .unwrap_or(false)
+    })
 }
 
 #[cfg(test)]
@@ -466,5 +517,114 @@ mod tests {
         .unwrap();
         assert!(tag.starts_with('v'));
         assert!(assets.as_array().is_some_and(|a| !a.is_empty()));
+    }
+
+    #[tokio::test]
+    async fn with_retry_succeeds_on_first_attempt() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
+
+        let counter = Arc::new(AtomicU32::new(0));
+        let c = counter.clone();
+        let out: Result<u32> = with_retry(
+            "noop",
+            |_| true,
+            move || {
+                let c = c.clone();
+                async move {
+                    c.fetch_add(1, Ordering::SeqCst);
+                    Ok(42)
+                }
+            },
+        )
+        .await;
+        assert_eq!(out.unwrap(), 42);
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn with_retry_skips_retry_when_predicate_false() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
+
+        let counter = Arc::new(AtomicU32::new(0));
+        let c = counter.clone();
+        let out: Result<()> = with_retry(
+            "non-transient",
+            |_| false,
+            move || {
+                let c = c.clone();
+                async move {
+                    c.fetch_add(1, Ordering::SeqCst);
+                    Err(anyhow!("permanent"))
+                }
+            },
+        )
+        .await;
+        assert!(out.is_err());
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn with_retry_exhausts_attempts_when_predicate_true() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
+
+        // Override the backoffs would require test-util; instead just accept
+        // the ~2s wallclock (sum of RETRY_BACKOFFS_MS) for this one test.
+        let counter = Arc::new(AtomicU32::new(0));
+        let c = counter.clone();
+        let out: Result<()> = with_retry(
+            "transient",
+            |_| true,
+            move || {
+                let c = c.clone();
+                async move {
+                    c.fetch_add(1, Ordering::SeqCst);
+                    Err(anyhow!("flaky"))
+                }
+            },
+        )
+        .await;
+        assert!(out.is_err());
+        assert_eq!(counter.load(Ordering::SeqCst), (RETRY_BACKOFFS_MS.len() + 1) as u32);
+    }
+
+    #[tokio::test]
+    async fn is_transient_reqwest_recognizes_connect_error() {
+        // 127.0.0.1:1 reliably refuses on Linux/macOS/Windows.
+        let err = reqwest::Client::new()
+            .get("http://127.0.0.1:1/nope")
+            .timeout(std::time::Duration::from_millis(500))
+            .send()
+            .await
+            .expect_err("connection to closed port must fail");
+        let wrapped = anyhow::Error::new(err).context("Failed to request something");
+        assert!(is_transient_reqwest(&wrapped));
+    }
+
+    #[tokio::test]
+    async fn is_transient_reqwest_rejects_status_error() {
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+        let err = reqwest::get(server.uri())
+            .await
+            .unwrap()
+            .error_for_status()
+            .expect_err("404 should produce status error");
+        let wrapped = anyhow::Error::new(err).context("GitHub returned an error status");
+        assert!(!is_transient_reqwest(&wrapped));
+    }
+
+    #[test]
+    fn is_transient_reqwest_rejects_plain_anyhow() {
+        let e = anyhow!("not a reqwest error at all");
+        assert!(!is_transient_reqwest(&e));
     }
 }
