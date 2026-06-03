@@ -17,7 +17,7 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 
 pub use client::dropped_count;
 pub use config::TraceConfig;
-pub use model::{SpanLink, SpanRecord, SpanStatus, TraceContext};
+pub use model::{IngestRequest, SpanLink, SpanRecord, SpanStatus, TraceContext};
 
 use client::TraceClient;
 
