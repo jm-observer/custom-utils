@@ -47,6 +47,21 @@ impl TraceContext {
         }
     }
 
+    /// 用指定 trace_id 建根（外部已有稳定标识——如 session_id 去 dash 后的 32 hex
+    /// ——希望复用为 trace_id 时用此构造）。非法格式（非 32 hex 或全零）回退 [`root`](Self::root)。
+    pub fn root_with_id(trace_id: impl Into<String>) -> Self {
+        let tid = trace_id.into();
+        if tid.len() != 32 || !is_hex(&tid) || tid.bytes().all(|b| b == b'0') {
+            return Self::root();
+        }
+        Self {
+            trace_id: tid,
+            span_id: gen_span_id(),
+            parent_span_id: None,
+            sampled: true,
+        }
+    }
+
     /// 同步下游 / 进程内子跳：**复用 trace_id**，开新 span，父 = 当前 span。
     pub fn child(&self) -> Self {
         Self {
@@ -148,6 +163,26 @@ mod tests {
         let local = back.child();
         assert_eq!(local.parent_span_id.as_deref(), Some(r.span_id.as_str()));
         assert_eq!(local.trace_id, r.trace_id);
+    }
+
+    #[test]
+    fn root_with_id_reuses_valid_trace_id() {
+        let tid = "c1c8f0e0de764d32a8821806ed482d8d";
+        let r = TraceContext::root_with_id(tid);
+        assert_eq!(r.trace_id, tid);
+        assert_eq!(r.span_id.len(), 16);
+        assert!(r.parent_span_id.is_none());
+    }
+
+    #[test]
+    fn root_with_id_falls_back_on_invalid() {
+        // 非 32 hex / 全零 / 非 hex 字符均回退随机 trace_id
+        for bad in ["short", "xyz", &"0".repeat(32), "session-uuid-with-dashes"] {
+            let r = TraceContext::root_with_id(bad);
+            assert_eq!(r.trace_id.len(), 32);
+            assert_ne!(r.trace_id, bad);
+            assert!(is_hex(&r.trace_id));
+        }
     }
 
     #[test]
