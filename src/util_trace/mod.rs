@@ -27,6 +27,11 @@ pub fn init(cfg: TraceConfig) {
     let _ = CLIENT.set(TraceClient::spawn(cfg));
 }
 
+/// 追踪是否已启用（已 init）。用于决定要不要注入 traceparent 等副作用。
+pub fn enabled() -> bool {
+    CLIENT.get().is_some()
+}
+
 /// 记录一个 span（仅入队，非阻塞）。未 init / 禁用 / 队列满时静默丢弃。
 /// `service` 为空时自动填入 init 时的服务名。
 pub fn record_span(mut rec: SpanRecord) {
