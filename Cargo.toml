@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "custom-utils"
-version = "0.14.3"
+version = "0.15.0"
 edition = "2021"
 description = "Provide customized tools based on features"
 repository = "https://github.com/jm-observer/custom-utils.git"
@@ -36,8 +36,10 @@ rustls-native-certs = { version = "0.6", optional = true }
 rustls = { version = "0.20", optional = true }
 # -----------------------------
 timer-util = { version = "0.3.2", optional = true }
-# trace 客户端契约（与 trace-hub 共享）。当前 path 依赖；发布前改 git-tag。
-trace-model = { path = "../trace-hub/crates/trace-model", optional = true }
+# trace 客户端契约（span/trace 数据模型）。原 trace-model crate 已内联进
+# src/util_trace/model；这两个依赖仅在 trace feature 下启用。
+serde = { version = "1", features = ["derive"], optional = true }
+uuid = { version = "1", features = ["v4"], optional = true }
 
 syn = { version = "2.0", features = ["extra-traits", "full"], optional = true }
 
@@ -70,7 +72,7 @@ daemon-async = ["libsystemd", "tokio"]
 daemon-sync = ["libsystemd"]
 timer = ["timer-util"]
 # 路线 B trace 客户端：异步推送 span+body 到 trace-hub。
-trace = ["trace-model", "tokio", "tokio/sync"]
+trace = ["serde", "uuid", "tokio", "tokio/sync"]
 # One feature for the whole Linux deploy stack: self-update + user-level
 # systemd install + watchdog + LinuxService/handle_cli.
 updater = ["tokio", "libsystemd"]

@@ -9,6 +9,7 @@
 
 mod client;
 mod config;
+mod model;
 
 use std::sync::OnceLock;
 
@@ -16,7 +17,7 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 
 pub use client::dropped_count;
 pub use config::TraceConfig;
-pub use trace_model::{SpanLink, SpanRecord, SpanStatus, TraceContext};
+pub use model::{SpanLink, SpanRecord, SpanStatus, TraceContext};
 
 use client::TraceClient;
 

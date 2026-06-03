@@ -3,7 +3,8 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use tokio::sync::mpsc;
-use trace_model::{IngestRequest, SpanRecord};
+
+use super::model::{IngestRequest, SpanRecord};
 
 use super::config::TraceConfig;
 
