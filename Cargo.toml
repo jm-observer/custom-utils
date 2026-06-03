@@ -36,6 +36,8 @@ rustls-native-certs = { version = "0.6", optional = true }
 rustls = { version = "0.20", optional = true }
 # -----------------------------
 timer-util = { version = "0.3.2", optional = true }
+# trace 客户端契约（与 trace-hub 共享）。当前 path 依赖；发布前改 git-tag。
+trace-model = { path = "../trace-hub/crates/trace-model", optional = true }
 
 syn = { version = "2.0", features = ["extra-traits", "full"], optional = true }
 
@@ -67,6 +69,8 @@ logger = ["flexi_logger", "lazy_static", "ansi_term"]
 daemon-async = ["libsystemd", "tokio"]
 daemon-sync = ["libsystemd"]
 timer = ["timer-util"]
+# 路线 B trace 客户端：异步推送 span+body 到 trace-hub。
+trace = ["trace-model", "tokio", "tokio/sync"]
 # One feature for the whole Linux deploy stack: self-update + user-level
 # systemd install + watchdog + LinuxService/handle_cli.
 updater = ["tokio", "libsystemd"]

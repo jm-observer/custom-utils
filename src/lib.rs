@@ -60,3 +60,11 @@ pub mod util_updater;
 pub mod updater {
     pub use crate::util_updater::*;
 }
+
+#[cfg(feature = "trace")]
+mod util_trace;
+
+#[cfg(feature = "trace")]
+pub mod trace {
+    pub use crate::util_trace::*;
+}
