@@ -85,5 +85,13 @@ pub mod trace {
 pub mod trace_propagation {
     tokio::task_local! {
         pub static CURRENT_TRACEPARENT: Option<String>;
+        /// 当前对话顶层 session_id（用户原 session），不随子 Agent 嵌套切换。
+        /// 用于回调（如 alarm-server 触发回包）跳过 binding 直接续接原 session，
+        /// 避免新建一个孤立 ghost session 中断 LLM 上下文。
+        /// 宿主（zero bridge-claw）在 start_turn 外层 scope；下游子进程经
+        /// `ZERO_SESSION_ID` env 拿到（nova ExternalCommandTool 注入），子进程
+        /// （alarm-cli）写入 callback_body.metadata.session_id；alarm-server
+        /// 持久化、触发回调时透传；zero gateway 入站直接拿来 forward_message。
+        pub static CURRENT_ZERO_SESSION_ID: Option<String>;
     }
 }
