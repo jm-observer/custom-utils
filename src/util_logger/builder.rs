@@ -1,6 +1,6 @@
 use ansi_term::{Color, Style};
 use anyhow::Result;
-use flexi_logger::writers::LogWriter;
+use flexi_logger::writers::{FileLogWriter, LogWriter};
 use flexi_logger::{Age, Duplicate, FlexiLoggerError, LogSpecification};
 use flexi_logger::{Cleanup, Criterion, FileSpec, Naming};
 use flexi_logger::{DeferredNow, FormatFunction, LevelFilter, LogSpecBuilder, Logger, LoggerHandle, Record, WriteMode};
@@ -224,6 +224,8 @@ pub struct LoggerFeatureBuilder {
     modules: Vec<(String, LevelFilter)>,
     writer: Option<Box<dyn LogWriter>>,
     log_etc_path: PathBuf,
+    log_path: PathBuf,
+    extra_files: Vec<(String, String)>,
 }
 impl LoggerFeatureBuilder {
     pub fn default(
@@ -234,7 +236,10 @@ impl LoggerFeatureBuilder {
         log_path: PathBuf,
     ) -> Self {
         // let fs_path = PathBuf::from_str("/var/local/log").unwrap().join(app);
-        let fs = FileSpec::default().directory(log_path).basename(app).suffix("log");
+        let fs = FileSpec::default()
+            .directory(log_path.clone())
+            .basename(app)
+            .suffix("log");
         // 若为true，则会覆盖rotate中的数字、keep^
         let criterion = Criterion::AgeOrSize(Age::Day, 10_000_000);
         let naming = Naming::Numbers;
@@ -252,7 +257,17 @@ impl LoggerFeatureBuilder {
             modules: Vec::new(),
             writer: None,
             log_etc_path,
+            log_path,
+            extra_files: Vec::new(),
         }
+    }
+    /// 注册一个独立输出文件，按 target 路由：
+    ///   log::info!(target: "{audit}", "...") → {log_path}/{basename}.log
+    /// 复用主轮转策略（criterion/naming/cleanup/append）。
+    /// 仅在 `prod` feature 下生效；非 prod（dev）下所有日志统一进 stdout，本设置被忽略。
+    pub fn extra_file(mut self, target: impl Into<String>, basename: impl Into<String>) -> Self {
+        self.extra_files.push((target.into(), basename.into()));
+        self
     }
     pub fn module<M: AsRef<str>>(mut self, module_name: M, lf: LevelFilter) -> Self {
         self.modules.push((module_name.as_ref().to_owned(), lf));
@@ -286,15 +301,30 @@ impl LoggerFeatureBuilder {
             log_spec_builder.module(module, level);
         }
         let path = self.log_etc_path.join(format!("{}.toml", self._app));
-        if let Some(w) = self.writer {
+        let extra_writers: Vec<(String, Box<dyn LogWriter>)> = self
+            .extra_files
+            .into_iter()
+            .map(|(target, basename)| {
+                let fs = FileSpec::default()
+                    .directory(self.log_path.clone())
+                    .basename(basename)
+                    .suffix("log");
+                let writer = FileLogWriter::builder(fs)
+                    .format(with_thread)
+                    .append()
+                    .rotate(self.criterion, self.naming, self.cleanup)
+                    .try_build()
+                    .unwrap();
+                (target, Box::new(writer) as Box<dyn LogWriter>)
+            })
+            .collect();
+        let mut logger = if let Some(w) = self.writer {
             Logger::with(log_spec_builder.build())
                 .format(with_thread)
                 .write_mode(WriteMode::Direct)
                 .log_to_file_and_writer(self.fs, w)
                 .o_append(self.append)
                 .rotate(self.criterion, self.naming, self.cleanup)
-                .start_with_specfile(path)
-                .unwrap()
         } else {
             Logger::with(log_spec_builder.build())
                 .format(with_thread)
@@ -302,9 +332,11 @@ impl LoggerFeatureBuilder {
                 .log_to_file(self.fs)
                 .o_append(self.append)
                 .rotate(self.criterion, self.naming, self.cleanup)
-                .start_with_specfile(path)
-                .unwrap()
+        };
+        for (target, writer) in extra_writers {
+            logger = logger.add_writer(target, writer);
         }
+        logger.start_with_specfile(path).unwrap()
     }
     #[cfg(not(feature = "prod"))]
     #[must_use]

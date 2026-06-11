@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-custom-utils = {path = "../../"}
+custom-utils = { path = "../../", features = ["logger", "prod"] }
